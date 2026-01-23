@@ -1,22 +1,18 @@
+import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Map;
 public class DatabaseConnection {
-    public static void main(String[] args) throws Exception{
+    public static Connection getConnection() throws Exception{
 
-        Map<String,String> dotenv = EnvLoader.loadEnv("./.env");
-        String host = dotenv.get("DB_HOST");
-        String port = dotenv.get("DB_PORT");
-        String dbName = dotenv.get("DB_NAME");
+        Map<String,String> env = EnvLoader.loadEnv("./.env");
+        String host = env.get("DB_HOST");
+        String port = env.get("DB_PORT");
+        String dbName = env.get("DB_NAME");
+        String user = env.get("DB_USER");
+        String password = env.get("DB_PASSWORD");
 
-        String url = "jdbc:mariadb://" + host + ":"+ port + "/" + dbName;
-        String user = dotenv.get("DB_USER");
-        String password = dotenv.get("DB_PASSWORD");
+        String url = String.format("jdbc:mariadb://%s:%s/%s", host, port, dbName);
 
-        try {
-            DriverManager.getConnection(url, user, password);
-            System.out.println("Connected!");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        return DriverManager.getConnection(url, user, password);
     }
 }
