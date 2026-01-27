@@ -40,6 +40,7 @@ public class StockManager {
         System.out.print("What do you want to do? ");
         String userResponse = scanner.nextLine();
         System.out.println("\n");
+        boolean exit;
         switch (userResponse) {
             case "1":
                 showProducts(conn, null, null);
@@ -50,11 +51,30 @@ public class StockManager {
                 showProducts(conn, filter, null);
                 break;
             case "3":
-                
+                System.out.print("New product name: ");
+                String name = scanner.nextLine();
+                String quantity;
+                do {
+                    System.out.print("New product quantity: ");
+                    quantity = scanner.nextLine();
+                    exit = quantity.matches("\\d+");
+                    if(!exit) {
+                        System.out.println("!!! Invalid quantity");
+                    }
+                } while (!exit);
+                String price;
+                do {
+                    System.out.print("New product price: ");
+                    price = scanner.nextLine();
+                    exit = price.matches("^\\d+[.,]\\d{2}$");
+                    if(!exit) {
+                        System.out.println("!!! Invalid price");
+                    }
+                } while (!exit);
+                createProduct(conn, name, quantity, price);
                 break;
             case "4":
                 String id;
-                boolean exit;
                 do {
                     System.out.print("Product ID: ");
                     id = scanner.nextLine();
@@ -114,8 +134,12 @@ public class StockManager {
 
     }
 
-    public static void addProduct(Connection conn) {
-        
+    public static void createProduct(Connection conn, String name, String quantity, String price) throws Exception{
+        String tableName = env.get("TABLE_NAME");
+        String query = String.format("INSERT INTO %s (name, quantity, price) VALUES ('%s',%s,%s)", tableName, name, quantity, price);
+        try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
+            System.out.println("Product added correctly");
+        }
     }
 
     public static void updateProduct(String id) {
