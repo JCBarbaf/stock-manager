@@ -5,11 +5,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
 public class StockManager {
-
     private static Map<String, String> env;
     private static Scanner scanner;
 
@@ -17,6 +17,7 @@ public class StockManager {
         env = EnvLoader.loadEnv("./.env");
         try (Connection conn = DatabaseConnection.getConnection()) {
             System.out.println("Database connection successful!");
+            System.out.println("\n ------ Wellcome to StockManager ^_^ ------");
             scanner = new Scanner(System.in);
             MainMenu(conn);
         } catch (Exception e) {
@@ -42,6 +43,7 @@ public class StockManager {
         System.out.println("\n");
         boolean exit;
         String id;
+        boolean validID;
         switch (userResponse) {
             case "1":
                 showProducts(conn, null, null);
@@ -79,10 +81,14 @@ public class StockManager {
                     System.out.print("Product ID: ");
                     id = scanner.nextLine();
                     exit = id.matches("\\d+");
+                    validID = checkproductID(conn, id);
                     if(!exit) {
                         System.out.println("!!! ID must be a number");
                     }
-                } while (!exit);
+                    if(!validID) {
+                        System.out.println("!!! Invalid ID");
+                    }
+                } while (!exit || !validID);
                 showProducts(conn, null, id);
                 updateMenu(conn, id);
                 break;
@@ -91,10 +97,14 @@ public class StockManager {
                     System.out.print("Product ID: ");
                     id = scanner.nextLine();
                     exit = id.matches("\\d+");
+                    validID = checkproductID(conn, id);
                     if(!exit) {
                         System.out.println("!!! ID must be a number");
                     }
-                } while (!exit);
+                    if(!validID) {
+                        System.out.println("!!! Invalid ID");
+                    }
+                } while (!exit || !validID);
                 showProducts(conn, null, id);
                 deleteProduct(conn, id);
                 break;
@@ -120,7 +130,7 @@ public class StockManager {
             query += String.format(" WHERE id = %s", ID);
         }
         try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
-            System.out.println("Products List:");
+            System.out.println("\nProducts List:");
             System.out.println("-----------------------------------------------");
             System.out.printf("%-5s | %-20s | %-8s | %-10s%n", "ID", "Name", "Quantity", "Price");
             System.out.println("-----------------------------------------------");
@@ -153,20 +163,7 @@ public class StockManager {
     }
 
     public static void updateMenu(Connection conn, String id) throws Exception {
-        String tableName = env.get("TABLE_NAME");
-        String query = String.format("SELECT name, quantity, price FROM %s WHERE id=%s", tableName, id);
-        String name;
-        int quantity;
-        BigDecimal price;
-        try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
-            if (rs.next()) { // move cursor to first row
-                name = rs.getString("name");
-                quantity = rs.getInt("quantity");
-                price = rs.getBigDecimal("price");
-            } else {
-                throw new SQLException("No data found");
-            } 
-        }
+        HashMap<String, String> productData = getProductData(conn, id);
         boolean repeat = true;
         while (repeat) {
             System.out.println("""
@@ -185,7 +182,8 @@ public class StockManager {
                 case "1":
                     System.out.print("New name: ");
                     String newName = scanner.nextLine();
-                    updateProduct(conn, id, newName, Integer.toString(quantity), price.toString());
+                    updateProduct(conn, id, newName, productData.get("quantity"), productData.get("price"));
+                    productData = getProductData(conn, id);
                     break;
                 case "2":
                     String newQuantity;
@@ -197,7 +195,8 @@ public class StockManager {
                             System.out.println("!!! Invalid quantity");
                         }
                     } while (!exit);
-                    updateProduct(conn, id, name, newQuantity, price.toString());
+                    updateProduct(conn, id, productData.get("name"), newQuantity, productData.get("price"));
+                    productData = getProductData(conn, id);
                     break;
                 case "3":
                     String newPrice;
@@ -209,7 +208,8 @@ public class StockManager {
                             System.out.println("!!! Invalid price");
                         }
                     } while (!exit);
-                    updateProduct(conn, id, name, Integer.toString(quantity), newPrice);
+                    updateProduct(conn, id, productData.get("name"), productData.get("quantity"), newPrice);
+                    productData = getProductData(conn, id);
                     break;
                 case "4":
                     repeat = false;
@@ -231,13 +231,41 @@ public class StockManager {
     }
 
     public static void deleteProduct(Connection conn, String id) throws Exception {
-        System.out.print("Are you sure you want to delete this product? (y/N): ");
+        System.out.print("\nAre you sure you want to delete this product? (y/N): ");
         String response = scanner.nextLine();
         if (response.equalsIgnoreCase("y") || response.equalsIgnoreCase("yes") || response.equalsIgnoreCase("yep")) {
             String tableName = env.get("TABLE_NAME");
             String query = String.format("DELETE FROM %s WHERE id=%s;", tableName, id);
             try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
                 System.out.println("Product deleted successfully");
+            }
+        }
+    }
+
+    public static HashMap<String,String> getProductData(Connection conn, String id) throws Exception {
+        String tableName = env.get("TABLE_NAME");
+        String query = String.format("SELECT name, quantity, price FROM %s WHERE id=%s", tableName, id);
+        HashMap<String, String> productData = new HashMap<>();
+        try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                productData.put("name", rs.getString("name"));
+                productData.put("quantity", Integer.toString(rs.getInt("quantity")));
+                productData.put("price", rs.getBigDecimal("price").toString());
+            } else {
+                throw new SQLException("No data found");
+            }
+        }
+        return productData;
+    }
+
+    public static boolean checkproductID(Connection conn, String id) throws Exception {
+        String tableName = env.get("TABLE_NAME");
+        String query = String.format("SELECT name, quantity, price FROM %s WHERE id=%s", tableName, id);
+        try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                return true;
+            } else {
+                return false;
             }
         }
     }
