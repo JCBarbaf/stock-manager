@@ -41,6 +41,7 @@ public class StockManager {
         String userResponse = scanner.nextLine();
         System.out.println("\n");
         boolean exit;
+        String id;
         switch (userResponse) {
             case "1":
                 showProducts(conn, null, null);
@@ -74,7 +75,6 @@ public class StockManager {
                 createProduct(conn, name, quantity, price);
                 break;
             case "4":
-                String id;
                 do {
                     System.out.print("Product ID: ");
                     id = scanner.nextLine();
@@ -84,10 +84,19 @@ public class StockManager {
                     }
                 } while (!exit);
                 showProducts(conn, null, id);
-                updateProduct(id);
+                updateMenu(conn, id);
                 break;
             case "5":
-                
+                do {
+                    System.out.print("Product ID: ");
+                    id = scanner.nextLine();
+                    exit = id.matches("\\d+");
+                    if(!exit) {
+                        System.out.println("!!! ID must be a number");
+                    }
+                } while (!exit);
+                showProducts(conn, null, id);
+                deleteProduct(conn, id);
                 break;
             case "6":
                 System.out.println("Goodbye! ^_^");
@@ -135,6 +144,7 @@ public class StockManager {
     }
 
     public static void createProduct(Connection conn, String name, String quantity, String price) throws Exception{
+        price = price.replace(",", ".");
         String tableName = env.get("TABLE_NAME");
         String query = String.format("INSERT INTO %s (name, quantity, price) VALUES ('%s',%s,%s)", tableName, name, quantity, price);
         try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
@@ -142,7 +152,21 @@ public class StockManager {
         }
     }
 
-    public static void updateProduct(String id) {
+    public static void updateMenu(Connection conn, String id) throws Exception {
+        String tableName = env.get("TABLE_NAME");
+        String query = String.format("SELECT name, quantity, price FROM %s WHERE id=%s", tableName, id);
+        String name;
+        int quantity;
+        BigDecimal price;
+        try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) { // move cursor to first row
+                name = rs.getString("name");
+                quantity = rs.getInt("quantity");
+                price = rs.getBigDecimal("price");
+            } else {
+                throw new SQLException("No data found");
+            } 
+        }
         boolean repeat = true;
         while (repeat) {
             System.out.println("""
@@ -151,20 +175,41 @@ public class StockManager {
 1- Change name
 2- Change quantity
 3- Change price
-4- CANCEL
+4- GO BACK
             """);
             System.out.print("What do you want to do? ");
             String userResponse = scanner.nextLine();
             System.out.println("\n");
+            boolean exit;
             switch (userResponse) {
                 case "1":
                     System.out.print("New name: ");
-
+                    String newName = scanner.nextLine();
+                    updateProduct(conn, id, newName, Integer.toString(quantity), price.toString());
                     break;
                 case "2":
+                    String newQuantity;
+                    do {
+                        System.out.print("New product quantity: ");
+                        newQuantity = scanner.nextLine();
+                        exit = newQuantity.matches("\\d+");
+                        if(!exit) {
+                            System.out.println("!!! Invalid quantity");
+                        }
+                    } while (!exit);
+                    updateProduct(conn, id, name, newQuantity, price.toString());
                     break;
                 case "3":
-                    
+                    String newPrice;
+                    do {
+                        System.out.print("New product price: ");
+                        newPrice = scanner.nextLine();
+                        exit = newPrice.matches("^\\d+[.,]\\d{2}$");
+                        if(!exit) {
+                            System.out.println("!!! Invalid price");
+                        }
+                    } while (!exit);
+                    updateProduct(conn, id, name, Integer.toString(quantity), newPrice);
                     break;
                 case "4":
                     repeat = false;
@@ -176,4 +221,24 @@ public class StockManager {
         }
     }
 
+    public static void updateProduct(Connection conn, String id, String name, String quantity, String price) throws Exception {
+        price = price.replace(",", ".");
+        String tableName = env.get("TABLE_NAME");
+        String query = String.format("UPDATE %s SET name = '%s', quantity = %s, price = %s WHERE id=%s;", tableName, name, quantity, price, id);
+        try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
+            System.out.println("Product updated successfully");
+        }
+    }
+
+    public static void deleteProduct(Connection conn, String id) throws Exception {
+        System.out.print("Are you sure you want to delete this product? (y/N): ");
+        String response = scanner.nextLine();
+        if (response.equalsIgnoreCase("y") || response.equalsIgnoreCase("yes") || response.equalsIgnoreCase("yep")) {
+            String tableName = env.get("TABLE_NAME");
+            String query = String.format("DELETE FROM %s WHERE id=%s;", tableName, id);
+            try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
+                System.out.println("Product deleted successfully");
+            }
+        }
+    }
 }
