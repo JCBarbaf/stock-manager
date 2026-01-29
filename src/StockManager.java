@@ -12,12 +12,14 @@ import java.util.Scanner;
 public class StockManager {
     private static Map<String, String> env;
     private static Scanner scanner;
+    private static String dbName;
 
     public static void main(String[] args) throws Exception {
         env = EnvLoader.loadEnv("./.env");
+        dbName = env.get("DB_NAME").replace("_", " ");
         try (Connection conn = DatabaseConnection.getConnection()) {
             System.out.println("Database connection successful!");
-            System.out.println("\n ------ Wellcome to StockManager ^_^ ------");
+            System.out.printf("\n ------ Wellcome to %s ------ \n", dbName);
             scanner = new Scanner(System.in);
             MainMenu(conn);
         } catch (Exception e) {
@@ -28,16 +30,16 @@ public class StockManager {
     public static void MainMenu(Connection conn) throws Exception{
         boolean repeat = true;
         while (repeat) {
-            System.out.println("""
+            System.out.printf("""
 
---- Stock Manager ---
+--- %s ---
 1- See all products
 2- Search a product
 3- Add new product
 4- Change a product
 5- Delete a product
 6- EXIT
-        """);
+        """, dbName.substring(0, 1).toUpperCase() + dbName.substring(1));
         System.out.print("What do you want to do? ");
         String userResponse = scanner.nextLine();
         System.out.println("\n");
@@ -131,9 +133,9 @@ public class StockManager {
         }
         try (PreparedStatement stmt = conn.prepareStatement(query); ResultSet rs = stmt.executeQuery()) {
             System.out.println("\nProducts List:");
-            System.out.println("-----------------------------------------------");
-            System.out.printf("%-5s | %-20s | %-8s | %-10s%n", "ID", "Name", "Quantity", "Price");
-            System.out.println("-----------------------------------------------");
+            System.out.println("-------------------------------------------------------------------");
+            System.out.printf("%-5s | %-35s | %-8s | %-20s%n", "ID", "Name", "Quantity", "Price");
+            System.out.println("-------------------------------------------------------------------");
 
             while (rs.next()) {
                 int id = rs.getInt("id");
@@ -141,7 +143,7 @@ public class StockManager {
                 int quantity = rs.getInt("quantity");
                 BigDecimal price = rs.getBigDecimal("price");
 
-                System.out.printf("%-5d | %-20s | %-8d | %-10.2f%n", id, name, quantity, price);
+                System.out.printf("%-5d | %-35s | %-8d | %-20.2f%n", id, name, quantity, price);
             }
         }
         if (ID == null) {
